@@ -89,12 +89,13 @@ the dashboard for each piece.
    `METAAPI_TOKEN`. Paste your token from metaapi.cloud. Everything else
    (`DATABASE_URL`, `JWT_SECRET`) is wired up or generated automatically.
 4. Click **Apply**. Render builds all three.
-5. After the first deploy, load the schema into the new database. Grab the
-   **External Database URL** from the `copytrade-db` page in Render, then
-   from your machine:
-   ```cmd
-   psql "<external-database-url-from-render>" -f backend\src\db\schema.sql
-   ```
+5. The database schema loads itself automatically — the backend service's
+   `preDeployCommand` (`npm run migrate`, see `render.yaml`) runs
+   `backend/src/db/migrate.js` before every deploy, which applies
+   `schema.sql` to whatever database is wired up via `DATABASE_URL`. There's
+   no manual database step: no `psql`, nothing to run from your own
+   machine. It's safe to run on every deploy since the schema uses
+   `CREATE TABLE IF NOT EXISTS`.
 6. Check the actual URLs Render assigned to `copytrade-backend` and
    `copytrade-frontend` — if they differ from the placeholders in
    `render.yaml` (`copytrade-backend.onrender.com` /

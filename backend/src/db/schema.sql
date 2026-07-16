@@ -1,6 +1,6 @@
 -- Users of the platform (both followers and traders are just "users";
 -- a user becomes a "trader" by having a row in trader_profiles)
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE users (
 -- A user's linked MetaTrader account. A user can link more than one,
 -- but each account plays exactly one role: it either follows (is a
 -- "subscriber" in CopyFactory terms) or it is followed (a "strategy").
-CREATE TABLE mt_accounts (
+CREATE TABLE IF NOT EXISTS mt_accounts (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   broker_server TEXT NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE mt_accounts (
 );
 
 -- Public profile for an mt_account acting as a master strategy.
-CREATE TABLE trader_profiles (
+CREATE TABLE IF NOT EXISTS trader_profiles (
   id SERIAL PRIMARY KEY,
   mt_account_id INTEGER NOT NULL UNIQUE REFERENCES mt_accounts(id) ON DELETE CASCADE,
   strategy_id TEXT NOT NULL,             -- CopyFactory strategy id
@@ -37,7 +37,7 @@ CREATE TABLE trader_profiles (
 );
 
 -- A follow relationship: a follower's mt_account subscribed to a trader's strategy.
-CREATE TABLE subscriptions (
+CREATE TABLE IF NOT EXISTS subscriptions (
   id SERIAL PRIMARY KEY,
   follower_account_id INTEGER NOT NULL REFERENCES mt_accounts(id) ON DELETE CASCADE,
   trader_profile_id INTEGER NOT NULL REFERENCES trader_profiles(id) ON DELETE CASCADE,
@@ -50,5 +50,5 @@ CREATE TABLE subscriptions (
   UNIQUE (follower_account_id, trader_profile_id)
 );
 
-CREATE INDEX idx_subscriptions_follower ON subscriptions(follower_account_id);
-CREATE INDEX idx_subscriptions_trader ON subscriptions(trader_profile_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_follower ON subscriptions(follower_account_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_trader ON subscriptions(trader_profile_id);
