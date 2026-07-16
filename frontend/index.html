@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wiretrade — copy trading</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+<script>
+  // On Render, the build command replaces __API_BASE__ with the real
+  // backend URL (see render.yaml). Locally, that placeholder is left
+  // untouched, so we fall back to localhost.
+  window.API_BASE = "__API_BASE__".startsWith("__")
+    ? "http://localhost:4000/api"
+    : "__API_BASE__";
+</script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Wiretrade</div>
+  <div class="ticker" id="ticker">
+    <div class="ticker-track" id="tickerTrack"><!-- populated by JS --></div>
+  </div>
+  <nav class="account-nav" id="accountNav"></nav>
+</header>
+
+<main id="app">
+
+  <!-- AUTH VIEW -->
+  <section id="view-auth" class="view">
+    <div class="auth-card">
+      <h1>Follow a trader. Copy every move.</h1>
+      <p class="sub">Link your MetaTrader account once. No installs, no settings files, no manual orders.</p>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Log in</button>
+        <button class="tab" data-tab="signup">Create account</button>
+      </div>
+
+      <form id="form-login" class="auth-form">
+        <label>Email<input type="email" name="email" required /></label>
+        <label>Password<input type="password" name="password" required /></label>
+        <button type="submit" class="btn primary">Log in</button>
+        <p class="form-error" data-for="login"></p>
+      </form>
+
+      <form id="form-signup" class="auth-form hidden">
+        <label>Display name<input type="text" name="displayName" required /></label>
+        <label>Email<input type="email" name="email" required /></label>
+        <label>Password<input type="password" name="password" required minlength="8" /></label>
+        <button type="submit" class="btn primary">Create account</button>
+        <p class="form-error" data-for="signup"></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- DASHBOARD VIEW -->
+  <section id="view-dashboard" class="view hidden">
+
+    <div class="grid">
+
+      <!-- Linked accounts -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Your MT4/5 accounts</h2>
+          <button class="btn small" id="btn-show-link">+ Link account</button>
+        </div>
+        <ul id="account-list" class="account-list"></ul>
+
+        <form id="form-link-account" class="inline-form hidden">
+          <div class="field-row">
+            <label>Platform
+              <select name="platform">
+                <option value="mt5">MT5</option>
+                <option value="mt4">MT4</option>
+              </select>
+            </label>
+            <label>Login<input type="text" name="login" required /></label>
+          </div>
+          <label>Broker server<input type="text" name="server" placeholder="e.g. ICMarkets-Live05" required /></label>
+          <label>Password<input type="password" name="password" required /></label>
+          <label>Nickname (optional)<input type="text" name="nickname" placeholder="Main account" /></label>
+          <button type="submit" class="btn primary">Connect account</button>
+          <p class="form-error" data-for="link-account"></p>
+          <p class="hint">Your password is used once to establish a secure connection and isn't stored on our side — it's held by our MetaTrader connectivity provider.</p>
+        </form>
+      </div>
+
+      <!-- Trader marketplace -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Traders to follow</h2>
+        </div>
+        <ul id="trader-list" class="trader-list"></ul>
+      </div>
+
+      <!-- Active follows -->
+      <div class="panel span-2">
+        <div class="panel-head">
+          <h2>You're following</h2>
+        </div>
+        <ul id="subscription-list" class="subscription-list"></ul>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

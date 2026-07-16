@@ -1,0 +1,45 @@
+databases:
+  - name: copytrade-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: 16
+
+services:
+  # Backend API
+  - type: web
+    name: copytrade-backend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: copytrade-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: METAAPI_TOKEN
+        sync: false          # set manually in the Render dashboard — don't commit real tokens
+      - key: CORS_ORIGIN
+        value: https://copytrade-frontend.onrender.com
+      - key: NODE_ENV
+        value: production
+
+  # Frontend static site
+  # Static sites have no server process, so env vars can't be read at
+  # runtime — this build command stamps the API_BASE value into
+  # index.html at build time instead (see the __API_BASE__ placeholder
+  # in frontend/index.html).
+  - type: web
+    name: copytrade-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: sed -i "s|__API_BASE__|$API_BASE|" index.html
+    staticPublishPath: .
+    envVars:
+      - key: API_BASE
+        value: https://copytrade-backend.onrender.com/api
