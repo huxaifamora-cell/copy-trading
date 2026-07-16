@@ -13,7 +13,6 @@ services:
     region: oregon
     rootDir: backend
     buildCommand: npm install
-    preDeployCommand: npm run migrate
     startCommand: npm start
     healthCheckPath: /health
     envVars:
