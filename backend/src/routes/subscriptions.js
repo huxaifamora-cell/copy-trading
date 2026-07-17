@@ -67,7 +67,7 @@ router.post('/', async (req, res) => {
     notify(req.userId, 'follow_started', `Started copying "${trader.headline}"`);
   } catch (err) {
     console.error(err);
-    res.status(502).json({ error: 'Could not start copying this trader' });
+    res.status(502).json({ error: `Could not start copying this trader: ${err.message || 'unknown error'}` });
   }
 });
 

@@ -34,6 +34,11 @@ async function provisionAccount({ login, password, server, platform }) {
     magic: 0,
     name: `acct-${login}`,
     type: 'cloud',
+    // Every linked account can follow (subscribe) by default. The
+    // PROVIDER role is granted separately, only when the user turns the
+    // account into a followable trader (see grantProviderRole below) —
+    // CopyFactory rejects strategy creation on accounts missing this flag.
+    copyFactoryRoles: ['SUBSCRIBER'],
   });
 
   // Wait for the terminal connection to come up before we consider the
@@ -44,6 +49,20 @@ async function provisionAccount({ login, password, server, platform }) {
   await account.waitConnected();
 
   return account.id;
+}
+
+/**
+ * Grants the CopyFactory PROVIDER role to an already-linked account, so it
+ * can be turned into a followable strategy. Required before
+ * copyFactoryService.createStrategy will succeed — MetaApi returns
+ * "not marked as CopyFactory strategy provider" otherwise.
+ */
+async function grantProviderRole(metaapiAccountId) {
+  const account = await metaApi.metatraderAccountApi.getAccount(metaapiAccountId);
+  const currentRoles = account.copyFactoryRoles || [];
+  if (!currentRoles.includes('PROVIDER')) {
+    await account.update({ copyFactoryRoles: [...currentRoles, 'PROVIDER'] });
+  }
 }
 
 async function removeAccount(metaapiAccountId) {
@@ -99,4 +118,4 @@ async function getAccountSnapshot(metaapiAccountId, historyDays = 30) {
   };
 }
 
-module.exports = { provisionAccount, removeAccount, getAccountSnapshot };
+module.exports = { provisionAccount, removeAccount, getAccountSnapshot, grantProviderRole };

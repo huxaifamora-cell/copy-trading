@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const copyFactoryService = require('../services/copyFactoryService');
+const metaApiService = require('../services/metaApiService');
 const { notify } = require('../services/notify');
 
 const router = express.Router();
@@ -37,6 +38,12 @@ router.post('/', requireAuth, async (req, res) => {
   if (!account) return res.status(404).json({ error: 'Account not found' });
 
   try {
+    // CopyFactory rejects strategy creation unless the account is flagged
+    // as a PROVIDER — accounts default to SUBSCRIBER-only at link time
+    // (see metaApiService.provisionAccount), so grant this the moment a
+    // user chooses to become a trader.
+    await metaApiService.grantProviderRole(account.metaapi_account_id);
+
     const strategyId = await copyFactoryService.createStrategy({
       metaapiAccountId: account.metaapi_account_id,
       name: headline,
@@ -55,7 +62,9 @@ router.post('/', requireAuth, async (req, res) => {
     notify(req.userId, 'became_trader', `"${headline}" is now listed in the marketplace`);
   } catch (err) {
     console.error(err);
-    res.status(502).json({ error: 'Could not set up this account as a followable strategy' });
+    res.status(502).json({
+      error: `Could not set up this account as a followable strategy: ${err.message || 'unknown error'}`,
+    });
   }
 });
 
