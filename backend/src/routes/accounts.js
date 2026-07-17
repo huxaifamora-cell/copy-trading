@@ -51,6 +51,25 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Live balance/equity + recent trade history for a linked account
+router.get('/:id/snapshot', async (req, res) => {
+  const result = await pool.query(
+    'SELECT * FROM mt_accounts WHERE id = $1 AND user_id = $2',
+    [req.params.id, req.userId]
+  );
+  const account = result.rows[0];
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+
+  try {
+    const days = Number(req.query.days) || 30;
+    const snapshot = await metaApiService.getAccountSnapshot(account.metaapi_account_id, days);
+    res.json({ snapshot });
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: 'Could not fetch account details from MetaTrader right now' });
+  }
+});
+
 // Unlink an account
 router.delete('/:id', async (req, res) => {
   const result = await pool.query(

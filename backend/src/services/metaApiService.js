@@ -52,4 +52,51 @@ async function removeAccount(metaapiAccountId) {
   await account.remove();
 }
 
-module.exports = { provisionAccount, removeAccount };
+/**
+ * Fetches live balance/equity/margin for a linked account, plus recent
+ * closed trades, in a single connection. Used to power the account
+ * details view in the dashboard.
+ *
+ * @param {string} metaapiAccountId
+ * @param {number} historyDays - how far back to pull closed trades
+ */
+async function getAccountSnapshot(metaapiAccountId, historyDays = 30) {
+  const account = await metaApi.metatraderAccountApi.getAccount(metaapiAccountId);
+  const connection = account.getRPCConnection();
+  await connection.connect();
+  await connection.waitSynchronized();
+
+  const info = await connection.getAccountInformation();
+
+  const endTime = new Date();
+  const startTime = new Date(endTime.getTime() - historyDays * 24 * 60 * 60 * 1000);
+  const deals = await connection.getDealsByTimeRange(startTime, endTime);
+
+  // Deals include balance operations (deposits/withdrawals) as well as
+  // actual trade fills — keep only closed trade fills for the history view.
+  const trades = (deals.deals || deals || [])
+    .filter((d) => d.entryType === 'DEAL_ENTRY_OUT' || d.entryType === 'DEAL_ENTRY_OUT_BY')
+    .map((d) => ({
+      time: d.time,
+      symbol: d.symbol,
+      type: d.type,
+      volume: d.volume,
+      price: d.price,
+      profit: d.profit,
+      commission: d.commission,
+      swap: d.swap,
+    }))
+    .sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  return {
+    balance: info.balance,
+    equity: info.equity,
+    margin: info.margin,
+    freeMargin: info.freeMargin,
+    currency: info.currency,
+    leverage: info.leverage,
+    trades,
+  };
+}
+
+module.exports = { provisionAccount, removeAccount, getAccountSnapshot };

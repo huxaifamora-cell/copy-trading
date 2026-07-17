@@ -144,6 +144,29 @@ document.getElementById('form-link-account').addEventListener('submit', async (e
   }
 });
 
+document.getElementById('form-become-trader').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.querySelector('.form-error[data-for="become-trader"]');
+  errEl.textContent = '';
+  const fd = new FormData(e.target);
+  try {
+    await api('/traders', {
+      method: 'POST',
+      body: {
+        mtAccountId: Number(fd.get('mtAccountId')),
+        headline: fd.get('headline'),
+        description: fd.get('description') || undefined,
+      },
+    });
+    toast('Now listed as a trader');
+    e.target.reset();
+    e.target.classList.add('hidden');
+    await Promise.all([loadAccounts(), loadTraders()]);
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
 // ---------- Data loading ----------
 async function loadAll() {
   await Promise.all([loadAccounts(), loadTraders(), loadSubscriptions()]);
@@ -183,10 +206,27 @@ function renderAccounts() {
         <div class="item-title">${acc.nickname || acc.mt_login} <span class="item-sub">· ${acc.platform.toUpperCase()}</span></div>
         <div class="item-sub">${acc.broker_server} · ${acc.role === 'trader' ? 'trader account' : 'follower account'}</div>
       </div>
-      <button class="btn small" data-remove-account="${acc.id}">Unlink</button>
+      <div>
+        <button class="btn small" data-view-details="${acc.id}">View details</button>
+        ${acc.role === 'follower' ? `<button class="btn small" data-become-trader="${acc.id}" data-account-label="${acc.nickname || acc.mt_login}">Make trader</button>` : ''}
+        <button class="btn small" data-remove-account="${acc.id}">Unlink</button>
+      </div>
     `;
     list.appendChild(li);
   }
+  list.querySelectorAll('[data-view-details]').forEach((btn) => {
+    btn.addEventListener('click', () => showAccountDetails(btn.dataset.viewDetails));
+  });
+  list.querySelectorAll('[data-become-trader]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const form = document.getElementById('form-become-trader');
+      form.classList.remove('hidden');
+      form.mtAccountId.value = btn.dataset.becomeTrader;
+      document.getElementById('become-trader-target').textContent =
+        `Listing "${btn.dataset.accountLabel}" as a followable trader`;
+      form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
   list.querySelectorAll('[data-remove-account]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       try {
@@ -198,6 +238,53 @@ function renderAccounts() {
       }
     });
   });
+}
+
+async function showAccountDetails(accountId) {
+  const panel = document.getElementById('account-details');
+  panel.classList.remove('hidden');
+  panel.innerHTML = '<p class="empty-state">Loading account details…</p>';
+
+  try {
+    const data = await api(`/accounts/${accountId}/snapshot?days=30`);
+    const s = data.snapshot;
+    const fmt = (n) => (typeof n === 'number' ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—');
+
+    const historyRows = s.trades.length
+      ? s.trades
+          .map(
+            (t) => `
+        <tr>
+          <td>${new Date(t.time).toLocaleString()}</td>
+          <td>${t.symbol || '—'}</td>
+          <td>${(t.type || '').replace('DEAL_TYPE_', '')}</td>
+          <td>${t.volume ?? '—'}</td>
+          <td>${t.price ?? '—'}</td>
+          <td class="${t.profit >= 0 ? 'profit-pos' : 'profit-neg'}">${fmt(t.profit)}</td>
+        </tr>`
+          )
+          .join('')
+      : `<tr><td colspan="6" class="empty-state">No closed trades in the last 30 days.</td></tr>`;
+
+    panel.innerHTML = `
+      <button class="details-close" id="close-details">✕ close</button>
+      <div class="balance-row">
+        <div class="balance-stat"><span class="label">Balance</span><span class="value">${fmt(s.balance)} ${s.currency || ''}</span></div>
+        <div class="balance-stat"><span class="label">Equity</span><span class="value ${s.equity >= s.balance ? 'positive' : 'negative'}">${fmt(s.equity)} ${s.currency || ''}</span></div>
+        <div class="balance-stat"><span class="label">Margin</span><span class="value">${fmt(s.margin)}</span></div>
+        <div class="balance-stat"><span class="label">Free margin</span><span class="value">${fmt(s.freeMargin)}</span></div>
+        <div class="balance-stat"><span class="label">Leverage</span><span class="value">1:${s.leverage ?? '—'}</span></div>
+      </div>
+      <table class="history-table">
+        <thead><tr><th>Time</th><th>Symbol</th><th>Type</th><th>Volume</th><th>Price</th><th>Profit</th></tr></thead>
+        <tbody>${historyRows}</tbody>
+      </table>
+    `;
+    document.getElementById('close-details').addEventListener('click', () => panel.classList.add('hidden'));
+  } catch (err) {
+    panel.innerHTML = `<p class="form-error">${err.message}</p><button class="details-close" id="close-details">✕ close</button>`;
+    document.getElementById('close-details').addEventListener('click', () => panel.classList.add('hidden'));
+  }
 }
 
 function renderTraders() {

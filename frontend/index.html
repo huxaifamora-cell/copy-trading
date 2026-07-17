@@ -68,6 +68,7 @@
           <button class="btn small" id="btn-show-link">+ Link account</button>
         </div>
         <ul id="account-list" class="account-list"></ul>
+        <div id="account-details" class="account-details hidden"></div>
 
         <form id="form-link-account" class="inline-form hidden">
           <div class="field-row">
@@ -85,6 +86,15 @@
           <button type="submit" class="btn primary">Connect account</button>
           <p class="form-error" data-for="link-account"></p>
           <p class="hint">Your password is used once to establish a secure connection and isn't stored on our side — it's held by our MetaTrader connectivity provider.</p>
+        </form>
+
+        <form id="form-become-trader" class="inline-form hidden">
+          <input type="hidden" name="mtAccountId" />
+          <p class="item-sub" id="become-trader-target"></p>
+          <label>Headline<input type="text" name="headline" placeholder="e.g. Conservative swing trading, EUR/USD focus" required /></label>
+          <label>Description (optional)<textarea name="description" rows="2" placeholder="A sentence or two about your approach"></textarea></label>
+          <button type="submit" class="btn primary">List as a trader</button>
+          <p class="form-error" data-for="become-trader"></p>
         </form>
       </div>
 
