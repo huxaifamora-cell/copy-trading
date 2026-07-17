@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const copyFactoryService = require('../services/copyFactoryService');
+const { notify } = require('../services/notify');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -63,6 +64,7 @@ router.post('/', async (req, res) => {
     );
 
     res.status(201).json({ subscription: result.rows[0] });
+    notify(req.userId, 'follow_started', `Started copying "${trader.headline}"`);
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: 'Could not start copying this trader' });
@@ -93,6 +95,7 @@ router.delete('/:id', async (req, res) => {
     [sub.id]
   );
   res.status(204).send();
+  notify(req.userId, 'follow_stopped', 'Stopped copying a trader');
 });
 
 module.exports = router;

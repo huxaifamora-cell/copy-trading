@@ -5,12 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Wiretrade — copy trading</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
 <script>
-  // On Render, the build command replaces __API_BASE__ with the real
-  // backend URL (see render.yaml). Locally, that placeholder is left
-  // untouched, so we fall back to localhost.
   window.API_BASE = "__API_BASE__".startsWith("__")
     ? "http://localhost:4000/api"
     : "__API_BASE__";
@@ -18,21 +15,13 @@
 </head>
 <body>
 
-<header class="topbar">
-  <div class="brand">Wiretrade</div>
-  <div class="ticker" id="ticker">
-    <div class="ticker-track" id="tickerTrack"><!-- populated by JS --></div>
-  </div>
-  <nav class="account-nav" id="accountNav"></nav>
-</header>
-
-<main id="app">
-
-  <!-- AUTH VIEW -->
-  <section id="view-auth" class="view">
+<!-- AUTH VIEW -->
+<section id="view-auth" class="view">
+  <div class="auth-shell">
+    <div class="auth-mark">Wiretrade</div>
     <div class="auth-card">
-      <h1>Follow a trader. Copy every move.</h1>
-      <p class="sub">Link your MetaTrader account once. No installs, no settings files, no manual orders.</p>
+      <h1>Follow a trader.<br>Copy every move.</h1>
+      <p class="sub">Link your MetaTrader account once. No installs, no manual orders, nothing to configure.</p>
 
       <div class="tabs">
         <button class="tab active" data-tab="login">Log in</button>
@@ -42,7 +31,7 @@
       <form id="form-login" class="auth-form">
         <label>Email<input type="email" name="email" required /></label>
         <label>Password<input type="password" name="password" required /></label>
-        <button type="submit" class="btn primary">Log in</button>
+        <button type="submit" class="btn primary full">Log in</button>
         <p class="form-error" data-for="login"></p>
       </form>
 
@@ -50,18 +39,131 @@
         <label>Display name<input type="text" name="displayName" required /></label>
         <label>Email<input type="email" name="email" required /></label>
         <label>Password<input type="password" name="password" required minlength="8" /></label>
-        <button type="submit" class="btn primary">Create account</button>
+        <button type="submit" class="btn primary full">Create account</button>
         <p class="form-error" data-for="signup"></p>
       </form>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- DASHBOARD VIEW -->
-  <section id="view-dashboard" class="view hidden">
+<!-- APP SHELL -->
+<div id="view-app" class="shell hidden">
 
-    <div class="grid">
+  <aside class="sidebar">
+    <div class="brand">Wiretrade<span class="brand-dot">·</span></div>
 
-      <!-- Linked accounts -->
+    <nav class="nav">
+      <button class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">◈</span><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="notifications">
+        <span class="nav-icon">◔</span><span>Notifications</span><span id="nav-notif-badge" class="badge hidden">0</span>
+      </button>
+      <button class="nav-item" data-page="trades">
+        <span class="nav-icon">↗</span><span>Trades</span>
+      </button>
+      <button class="nav-item" data-page="traders">
+        <span class="nav-icon">☍</span><span>Traders</span>
+      </button>
+      <button class="nav-item" data-page="account">
+        <span class="nav-icon">◐</span><span>Account</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="user-avatar" id="user-avatar">·</div>
+        <div class="user-name" id="user-name-display"></div>
+      </div>
+      <button id="btn-logout" class="btn ghost small full">Log out</button>
+    </div>
+  </aside>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section id="page-dashboard" class="page">
+      <header class="page-head">
+        <h1>Dashboard</h1>
+        <p class="page-sub">Your copy trading activity at a glance.</p>
+      </header>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <span class="stat-label">Linked accounts</span>
+          <span class="stat-value" id="stat-accounts">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Active follows</span>
+          <span class="stat-value" id="stat-follows">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Traders you list</span>
+          <span class="stat-value" id="stat-trader-accounts">—</span>
+        </div>
+        <div class="stat-card accent">
+          <span class="stat-label">Unread notifications</span>
+          <span class="stat-value" id="stat-unread">—</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Recent activity</h2><button class="link-btn" data-goto="notifications">View all →</button></div>
+        <ul id="dashboard-activity" class="activity-list"></ul>
+      </div>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section id="page-notifications" class="page hidden">
+      <header class="page-head">
+        <h1>Notifications</h1>
+        <p class="page-sub">Account and copy trading activity.</p>
+        <button class="btn ghost small" id="btn-mark-all-read">Mark all read</button>
+      </header>
+      <ul id="notifications-list" class="activity-list panel"></ul>
+    </section>
+
+    <!-- TRADES -->
+    <section id="page-trades" class="page hidden">
+      <header class="page-head">
+        <h1>Trades</h1>
+        <p class="page-sub">Balance, equity, and trade history per linked account.</p>
+      </header>
+
+      <div class="panel">
+        <label class="inline-label">Account
+          <select id="trades-account-select"></select>
+        </label>
+        <div id="trades-content"><p class="empty-state">Link an account to see trade history.</p></div>
+      </div>
+    </section>
+
+    <!-- TRADERS -->
+    <section id="page-traders" class="page hidden">
+      <header class="page-head">
+        <h1>Traders</h1>
+        <p class="page-sub">Browse and follow traders, or manage who you're copying.</p>
+      </header>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><h2>Marketplace</h2></div>
+          <ul id="trader-list" class="trader-list"></ul>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>You're following</h2></div>
+          <ul id="subscription-list" class="subscription-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACCOUNT -->
+    <section id="page-account" class="page hidden">
+      <header class="page-head">
+        <h1>Account</h1>
+        <p class="page-sub">Link MetaTrader accounts and manage your trader profile.</p>
+      </header>
+
       <div class="panel">
         <div class="panel-head">
           <h2>Your MT4/5 accounts</h2>
@@ -97,27 +199,10 @@
           <p class="form-error" data-for="become-trader"></p>
         </form>
       </div>
+    </section>
 
-      <!-- Trader marketplace -->
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Traders to follow</h2>
-        </div>
-        <ul id="trader-list" class="trader-list"></ul>
-      </div>
-
-      <!-- Active follows -->
-      <div class="panel span-2">
-        <div class="panel-head">
-          <h2>You're following</h2>
-        </div>
-        <ul id="subscription-list" class="subscription-list"></ul>
-      </div>
-
-    </div>
-  </section>
-
-</main>
+  </main>
+</div>
 
 <div id="toast" class="toast hidden"></div>
 

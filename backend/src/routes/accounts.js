@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const metaApiService = require('../services/metaApiService');
+const { notify } = require('../services/notify');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -42,6 +43,7 @@ router.post('/', async (req, res) => {
     );
 
     res.status(201).json({ account: result.rows[0] });
+    notify(req.userId, 'account_linked', `Linked ${platform.toUpperCase()} account ${login} (${server})`);
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'This account is already linked to your profile' });

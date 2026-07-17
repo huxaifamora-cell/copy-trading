@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const copyFactoryService = require('../services/copyFactoryService');
+const { notify } = require('../services/notify');
 
 const router = express.Router();
 
@@ -51,6 +52,7 @@ router.post('/', requireAuth, async (req, res) => {
     );
 
     res.status(201).json({ traderProfile: result.rows[0] });
+    notify(req.userId, 'became_trader', `"${headline}" is now listed in the marketplace`);
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: 'Could not set up this account as a followable strategy' });
