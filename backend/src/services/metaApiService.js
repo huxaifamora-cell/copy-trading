@@ -56,12 +56,33 @@ async function provisionAccount({ login, password, server, platform }) {
  * can be turned into a followable strategy. Required before
  * copyFactoryService.createStrategy will succeed — MetaApi returns
  * "not marked as CopyFactory strategy provider" otherwise.
+ *
+ * NOTE: MetaApi's account.update() appears to validate against the full
+ * editable account payload rather than merging in a single changed field,
+ * so this re-sends the account's current name/magic/tags alongside the
+ * new copyFactoryRoles rather than sending copyFactoryRoles alone. If you
+ * hit a "Validation failed" error here, check the current
+ * UpdatedMetatraderAccountDto shape at https://metaapi.cloud/docs/client/
+ * — this is exactly the kind of SDK drift flagged in the README.
  */
 async function grantProviderRole(metaapiAccountId) {
   const account = await metaApi.metatraderAccountApi.getAccount(metaapiAccountId);
   const currentRoles = account.copyFactoryRoles || [];
-  if (!currentRoles.includes('PROVIDER')) {
-    await account.update({ copyFactoryRoles: [...currentRoles, 'PROVIDER'] });
+  if (currentRoles.includes('PROVIDER')) return;
+
+  try {
+    await account.update({
+      name: account.name,
+      magic: account.magic,
+      quoteStreamingIntervalInSeconds: account.quoteStreamingIntervalInSeconds,
+      tags: account.tags || [],
+      copyFactoryRoles: [...currentRoles, 'PROVIDER'],
+    });
+  } catch (err) {
+    // MetaApi's error objects often have useful info outside `message` —
+    // log everything so a "Validation failed" isn't a dead end next time.
+    console.error('grantProviderRole failed. Full error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    throw err;
   }
 }
 
