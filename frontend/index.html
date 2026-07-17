@@ -49,6 +49,14 @@
 <!-- APP SHELL -->
 <div id="view-app" class="shell hidden">
 
+  <div class="mobile-topbar">
+    <div class="brand">Wiretrade<span class="brand-dot">·</span></div>
+    <div class="mobile-topbar-right">
+      <span id="mobile-notif-dot" class="notif-dot hidden"></span>
+      <button id="btn-logout-mobile" class="btn ghost small">Log out</button>
+    </div>
+  </div>
+
   <aside class="sidebar">
     <div class="brand">Wiretrade<span class="brand-dot">·</span></div>
 
@@ -78,6 +86,24 @@
       <button id="btn-logout" class="btn ghost small full">Log out</button>
     </div>
   </aside>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="dashboard">
+      <span class="nav-icon">◈</span><span>Dashboard</span>
+    </button>
+    <button class="nav-item" data-page="notifications">
+      <span class="nav-icon">◔</span><span>Alerts</span><span id="nav-notif-badge-mobile" class="badge hidden">0</span>
+    </button>
+    <button class="nav-item" data-page="trades">
+      <span class="nav-icon">↗</span><span>Trades</span>
+    </button>
+    <button class="nav-item" data-page="traders">
+      <span class="nav-icon">☍</span><span>Traders</span>
+    </button>
+    <button class="nav-item" data-page="account">
+      <span class="nav-icon">◐</span><span>Account</span>
+    </button>
+  </nav>
 
   <main class="content">
 

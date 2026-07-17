@@ -55,6 +55,7 @@ function showApp() {
   document.getElementById('user-name-display').textContent = state.user.display_name;
   document.getElementById('user-avatar').textContent = state.user.display_name.charAt(0);
   document.getElementById('btn-logout').addEventListener('click', logout);
+  document.getElementById('btn-logout-mobile').addEventListener('click', logout);
   loadAll();
 }
 
@@ -266,12 +267,15 @@ function renderDashboard() {
 // ---------- Rendering: notifications ----------
 function renderNotifBadge() {
   const badge = document.getElementById('nav-notif-badge');
-  if (state.unreadCount > 0) {
-    badge.textContent = state.unreadCount;
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
+  const badgeMobile = document.getElementById('nav-notif-badge-mobile');
+  const dot = document.getElementById('mobile-notif-dot');
+  const has = state.unreadCount > 0;
+  [badge, badgeMobile].forEach((el) => {
+    if (!el) return;
+    el.textContent = state.unreadCount;
+    el.classList.toggle('hidden', !has);
+  });
+  if (dot) dot.classList.toggle('hidden', !has);
 }
 
 function renderNotifications() {
@@ -365,10 +369,10 @@ async function showAccountDetails(accountId) {
         <div class="balance-stat"><span class="label">Free margin</span><span class="value">${fmt(s.freeMargin)}</span></div>
         <div class="balance-stat"><span class="label">Leverage</span><span class="value">1:${s.leverage ?? '—'}</span></div>
       </div>
-      <table class="history-table">
+      <div class="table-scroll"><table class="history-table">
         <thead><tr><th>Time</th><th>Symbol</th><th>Type</th><th>Volume</th><th>Price</th><th>Profit</th></tr></thead>
         <tbody>${historyRows}</tbody>
-      </table>
+      </table></div>
     `;
     document.getElementById('close-details').addEventListener('click', () => panel.classList.add('hidden'));
   } catch (err) {
@@ -422,10 +426,10 @@ async function loadTradesForSelectedAccount() {
         <div class="balance-stat"><span class="label">Equity</span><span class="value ${s.equity >= s.balance ? 'positive' : 'negative'}">${fmt(s.equity)} ${s.currency || ''}</span></div>
         <div class="balance-stat"><span class="label">Margin</span><span class="value">${fmt(s.margin)}</span></div>
       </div>
-      <table class="history-table">
+      <div class="table-scroll"><table class="history-table">
         <thead><tr><th>Time</th><th>Symbol</th><th>Type</th><th>Volume</th><th>Price</th><th>Profit</th></tr></thead>
         <tbody>${rows}</tbody>
-      </table>
+      </table></div>
     `;
   } catch (err) {
     container.innerHTML = `<p class="form-error">${err.message}</p>`;
