@@ -57,32 +57,47 @@ async function provisionAccount({ login, password, server, platform }) {
  * copyFactoryService.createStrategy will succeed — MetaApi returns
  * "not marked as CopyFactory strategy provider" otherwise.
  *
- * NOTE: MetaApi's account.update() appears to validate against the full
- * editable account payload rather than merging in a single changed field,
- * so this re-sends the account's current name/magic/tags alongside the
- * new copyFactoryRoles rather than sending copyFactoryRoles alone. If you
- * hit a "Validation failed" error here, check the current
- * UpdatedMetatraderAccountDto shape at https://metaapi.cloud/docs/client/
- * — this is exactly the kind of SDK drift flagged in the README.
+ * This deliberately bypasses account.update() from the SDK. CopyFactory
+ * roles are set through a separate, dedicated endpoint —
+ * POST /users/current/accounts/:accountId/enable-account-features — with
+ * a nested { copyFactoryApi: { copyFactoryRoles, copyFactoryResourceSlots } }
+ * payload, not through the general account update call. Calling
+ * account.update({ copyFactoryRoles: [...] }) hits a different endpoint
+ * entirely and fails validation, which is what happened during initial
+ * development of this feature — see
+ * https://metaapi.cloud/docs/provisioning/api/account/enableFeaturesOrApis/
+ *
+ * NOTE: MetaApi's docs mark this endpoint as a paid option and note the
+ * account is briefly stopped/redeployed while the change applies — expect
+ * a short delay before the account is usable again after this call.
  */
 async function grantProviderRole(metaapiAccountId) {
   const account = await metaApi.metatraderAccountApi.getAccount(metaapiAccountId);
   const currentRoles = account.copyFactoryRoles || [];
   if (currentRoles.includes('PROVIDER')) return;
 
-  try {
-    await account.update({
-      name: account.name,
-      magic: account.magic,
-      quoteStreamingIntervalInSeconds: account.quoteStreamingIntervalInSeconds,
-      tags: account.tags || [],
-      copyFactoryRoles: [...currentRoles, 'PROVIDER'],
-    });
-  } catch (err) {
-    // MetaApi's error objects often have useful info outside `message` —
-    // log everything so a "Validation failed" isn't a dead end next time.
-    console.error('grantProviderRole failed. Full error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
-    throw err;
+  const roles = [...new Set([...currentRoles, 'PROVIDER'])];
+
+  const res = await fetch(
+    `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai/users/current/accounts/${metaapiAccountId}/enable-account-features`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'auth-token': token,
+      },
+      body: JSON.stringify({
+        copyFactoryApi: {
+          copyFactoryRoles: roles,
+          copyFactoryResourceSlots: 1,
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to enable CopyFactory provider role (HTTP ${res.status}): ${body}`);
   }
 }
 
