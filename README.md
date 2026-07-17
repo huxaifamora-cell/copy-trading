@@ -89,13 +89,15 @@ the dashboard for each piece.
    `METAAPI_TOKEN`. Paste your token from metaapi.cloud. Everything else
    (`DATABASE_URL`, `JWT_SECRET`) is wired up or generated automatically.
 4. Click **Apply**. Render builds all three.
-5. The database schema loads itself automatically — the backend service's
-   `preDeployCommand` (`npm run migrate`, see `render.yaml`) runs
-   `backend/src/db/migrate.js` before every deploy, which applies
-   `schema.sql` to whatever database is wired up via `DATABASE_URL`. There's
-   no manual database step: no `psql`, nothing to run from your own
-   machine. It's safe to run on every deploy since the schema uses
-   `CREATE TABLE IF NOT EXISTS`.
+5. The database schema loads itself automatically — the backend applies
+   `schema.sql` to whatever database `DATABASE_URL` points to as part of
+   its own startup, before it accepts any requests (see the top of
+   `backend/src/server.js`). There's no manual database step, and it
+   doesn't rely on Render's Pre-Deploy Command field (which can be locked
+   on Blueprint-managed services on some plans) — it's just normal
+   application code that runs every time the server boots. It's safe to
+   run on every restart since the schema uses `CREATE TABLE IF NOT
+   EXISTS`.
 6. Check the actual URLs Render assigned to `copytrade-backend` and
    `copytrade-frontend` — if they differ from the placeholders in
    `render.yaml` (`copytrade-backend.onrender.com` /

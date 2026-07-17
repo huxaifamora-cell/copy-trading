@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const { pool } = require('./db');
+const { applyMigrations } = require('./db/migrate');
 const authRoutes = require('./routes/auth');
 const accountRoutes = require('./routes/accounts');
 const traderRoutes = require('./routes/traders');
@@ -25,4 +27,19 @@ app.use((err, req, res, next) => {
 });
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`Copy trading API listening on :${port}`));
+
+// Apply the schema on every boot before accepting traffic. This is what
+// keeps the database up to date without needing Render's Pre-Deploy
+// Command field (which can be locked on Blueprint-managed services) —
+// it just runs as part of normal app startup instead.
+(async () => {
+  try {
+    await applyMigrations(pool);
+    console.log('Database schema is up to date.');
+  } catch (err) {
+    console.error('Failed to apply database migrations:', err.message);
+    process.exit(1);
+  }
+
+  app.listen(port, () => console.log(`Copy trading API listening on :${port}`));
+})();
