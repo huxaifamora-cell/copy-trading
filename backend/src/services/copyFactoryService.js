@@ -36,6 +36,16 @@ async function deleteStrategy(strategyId) {
 
 /**
  * Subscribes a follower's MT account to a trader's strategy.
+ *
+ * Uses CopyFactory's `stopOutRisk` field (not `riskLimits`) to express a
+ * simple max-drawdown auto-stop — riskLimits is a different, more general
+ * mechanism keyed on a time period (day/week/month/... — not "drawdown")
+ * plus an `applyTo` metric selector, and sending `type: 'drawdown'` there
+ * fails validation. stopOutRisk is CopyFactory's dedicated field for
+ * "pause copying once relative loss exceeds X%", which is exactly what
+ * maxDrawdownPct means in this app. See:
+ * https://metaapi.cloud/docs/copyfactory/models/strategySubscription/
+ *
  * @returns {Promise<string>} subscriberId used as the "subscription id"
  */
 async function subscribe({ metaapiAccountId, strategyId, sizeScaling, maxDrawdownPct }) {
@@ -48,13 +58,10 @@ async function subscribe({ metaapiAccountId, strategyId, sizeScaling, maxDrawdow
         strategyId,
         multiplier: sizeScaling,               // e.g. 0.5 = copy at half size
         skipPendingOrders: false,
-      },
-    ],
-    riskLimits: [
-      {
-        type: 'drawdown',
-        maxRelativeRisk: maxDrawdownPct / 100,
-        closePositions: true,                  // auto-stop-copy if breached
+        stopOutRisk: {
+          relativeValue: maxDrawdownPct / 100,  // e.g. 20 -> 0.2 (20% drawdown)
+          startTime: new Date().toISOString(),
+        },
       },
     ],
   });
