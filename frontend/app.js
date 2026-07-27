@@ -54,6 +54,7 @@ function showApp() {
   document.getElementById('view-app').classList.remove('hidden');
   document.getElementById('user-name-display').textContent = state.user.display_name;
   document.getElementById('user-avatar').textContent = state.user.display_name.charAt(0);
+  renderVerifyBanner();
   document.getElementById('btn-logout').addEventListener('click', logout);
   document.getElementById('btn-logout-mobile').addEventListener('click', logout);
   loadAll();
@@ -191,7 +192,7 @@ document.getElementById('form-become-trader').addEventListener('submit', async (
     toast('Now listed as a trader');
     e.target.reset();
     e.target.classList.add('hidden');
-    await Promise.all([loadAccounts(), loadTraders()]);
+    await Promise.all([loadAccounts(), loadTraders(), loadTraderProfilesMine()]);
     await loadNotifications();
   } catch (err) {
     errEl.textContent = err.message;
@@ -214,7 +215,7 @@ async function markAllNotificationsRead() {
 
 // ---------- Data loading ----------
 async function loadAll() {
-  await Promise.all([loadAccounts(), loadTraders(), loadSubscriptions(), loadNotifications()]);
+  await Promise.all([loadAccounts(), loadTraders(), loadSubscriptions(), loadNotifications(), loadTraderProfilesMine()]);
   renderDashboard();
 }
 
@@ -446,18 +447,37 @@ function renderTraders() {
   }
   for (const trader of state.traders) {
     const li = document.createElement('li');
+    const feeLabel = trader.fee_enabled && trader.fee_cents
+      ? ` · $${(trader.fee_cents / 100).toFixed(2)}/mo`
+      : '';
     li.innerHTML = `
       <div>
         <div class="item-title">${trader.trader_name} — ${trader.headline}</div>
-        <div class="item-sub">${trader.follower_count} follower${trader.follower_count == 1 ? '' : 's'}</div>
+        <div class="item-sub">${trader.follower_count} follower${trader.follower_count == 1 ? '' : 's'}${feeLabel}</div>
       </div>
-      <button class="btn follow" data-follow-trader="${trader.id}">Follow</button>
+      <button class="btn follow" data-follow-trader="${trader.id}" data-trader-label="${trader.trader_name} — ${trader.headline}">Follow</button>
     `;
     list.appendChild(li);
   }
   list.querySelectorAll('[data-follow-trader]').forEach((btn) => {
-    btn.addEventListener('click', () => followTrader(btn.dataset.followTrader));
+    btn.addEventListener('click', () => openFollowForm(btn.dataset.followTrader, btn.dataset.traderLabel));
   });
+}
+
+function riskSummary(rs) {
+  if (!rs || Object.keys(rs).length === 0) return 'Default settings';
+  const parts = [];
+  const mode = rs.lotSizing?.mode;
+  if (mode === 'mirror') parts.push('mirrors trader\'s lots');
+  else if (mode === 'balance_scaled') parts.push('scaled by balance');
+  else if (mode) parts.push(`${mode.replace('_', ' ')} ${rs.lotSizing?.multiplier ?? ''}x`);
+  if (rs.symbolAllowlist?.length) parts.push(`symbols: ${rs.symbolAllowlist.join(', ')}`);
+  if (rs.maxOpenPositions) parts.push(`max ${rs.maxOpenPositions} positions`);
+  if (rs.maxTradesPerDay) parts.push(`max ${rs.maxTradesPerDay} trades/day`);
+  if (rs.dailyLossLimitPct) parts.push(`daily loss limit ${rs.dailyLossLimitPct}%`);
+  if (rs.dailyProfitTargetPct) parts.push(`daily target ${rs.dailyProfitTargetPct}%`);
+  if (rs.maxDrawdownPct) parts.push(`max drawdown ${rs.maxDrawdownPct}%`);
+  return parts.join(' · ') || 'Default settings';
 }
 
 function renderSubscriptions() {
@@ -470,12 +490,21 @@ function renderSubscriptions() {
   for (const sub of state.subscriptions) {
     const li = document.createElement('li');
     const stopped = sub.status === 'stopped';
+    const paused = sub.status === 'paused';
+    let actions = '';
+    if (stopped) {
+      actions = '';
+    } else if (paused) {
+      actions = `<button class="btn small" data-resume="${sub.id}">Resume</button><button class="btn unfollow" data-unfollow="${sub.id}">Unfollow</button>`;
+    } else {
+      actions = `<button class="btn small" data-pause="${sub.id}">Pause</button><button class="btn unfollow" data-unfollow="${sub.id}">Unfollow</button>`;
+    }
     li.innerHTML = `
       <div>
         <div class="item-title">${sub.trader_name} <span class="item-sub">→ ${sub.follower_account_nickname || 'your account'}</span></div>
-        <div class="item-sub">${stopped ? 'Stopped' : `Copying at ${sub.size_scaling}x size · max drawdown ${sub.max_drawdown_pct}%`}</div>
+        <div class="item-sub">${stopped ? 'Stopped' : paused ? 'Paused · ' + riskSummary(sub.risk_settings) : riskSummary(sub.risk_settings)}</div>
       </div>
-      ${stopped ? '' : `<button class="btn unfollow" data-unfollow="${sub.id}">Unfollow</button>`}
+      <div>${actions}</div>
     `;
     list.appendChild(li);
   }
@@ -491,30 +520,267 @@ function renderSubscriptions() {
       }
     });
   });
+  list.querySelectorAll('[data-pause]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await api(`/subscriptions/${btn.dataset.pause}/pause`, { method: 'POST' });
+        toast('Paused copying');
+        await loadSubscriptions();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+  });
+  list.querySelectorAll('[data-resume]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await api(`/subscriptions/${btn.dataset.resume}/resume`, { method: 'POST' });
+        toast('Resumed copying');
+        await loadSubscriptions();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+  });
 }
 
-async function followTrader(traderProfileId) {
+// ---------- Follow form (risk settings) ----------
+function openFollowForm(traderProfileId, label) {
   if (state.accounts.length === 0) {
     toast('Link a MetaTrader account first', true);
     return;
   }
+  const form = document.getElementById('form-follow');
+  document.getElementById('follow-form-placeholder').classList.add('hidden');
+  form.classList.remove('hidden');
+  form.traderProfileId.value = traderProfileId;
+  document.getElementById('follow-form-target').textContent = `Following: ${label}`;
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.getElementById('btn-cancel-follow').addEventListener('click', () => {
+  document.getElementById('form-follow').classList.add('hidden');
+  document.getElementById('follow-form-placeholder').classList.remove('hidden');
+});
+
+document.querySelectorAll('input[name="lotMode"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    const wrap = document.getElementById('lot-value-wrap');
+    const mode = document.querySelector('input[name="lotMode"]:checked').value;
+    wrap.classList.toggle('hidden', mode === 'mirror' || mode === 'balance_scaled');
+  });
+});
+
+document.getElementById('form-follow').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.querySelector('.form-error[data-for="follow"]');
+  errEl.textContent = '';
+  const fd = new FormData(e.target);
+
+  const symbolAllowlistRaw = (fd.get('symbolAllowlist') || '').trim();
+  const symbolAllowlist = symbolAllowlistRaw
+    ? symbolAllowlistRaw.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+    : undefined;
+
+  const numOrUndefined = (v) => (v ? Number(v) : undefined);
+
+  const riskSettings = {
+    lotSizing: {
+      mode: fd.get('lotMode'),
+      multiplier: numOrUndefined(fd.get('lotValue')),
+      fixedLotSize: fd.get('lotMode') === 'fixed_lot' ? numOrUndefined(fd.get('lotValue')) : undefined,
+    },
+    symbolAllowlist,
+    perTradeStopLossPips: numOrUndefined(fd.get('perTradeStopLossPips')),
+    maxOpenPositions: numOrUndefined(fd.get('maxOpenPositions')),
+    maxTradesPerDay: numOrUndefined(fd.get('maxTradesPerDay')),
+    dailyLossLimitPct: numOrUndefined(fd.get('dailyLossLimitPct')),
+    dailyProfitTargetPct: numOrUndefined(fd.get('dailyProfitTargetPct')),
+    maxDrawdownPct: numOrUndefined(fd.get('maxDrawdownPct')) ?? 20,
+  };
+
   const followerAccountId = state.accounts[0].id; // MVP: copy onto the first linked account
+
   try {
     await api('/subscriptions', {
       method: 'POST',
-      body: { followerAccountId, traderProfileId },
+      body: { followerAccountId, traderProfileId: Number(fd.get('traderProfileId')), riskSettings },
     });
     toast('Now copying this trader');
+    e.target.reset();
+    e.target.classList.add('hidden');
+    document.getElementById('follow-form-placeholder').classList.remove('hidden');
+    document.getElementById('lot-value-wrap').classList.add('hidden');
     await loadSubscriptions();
     await loadNotifications();
   } catch (err) {
-    toast(err.message, true);
+    errEl.textContent = err.message;
+  }
+});
+
+// ---------- Trader milestones & fee ----------
+async function loadTraderProfilesMine() {
+  try {
+    const data = await api('/traders/mine');
+    renderTraderProfilesMine(data.traderProfiles);
+  } catch (err) {
+    // non-critical for the page to still function
   }
 }
 
-// ---------- Init ----------
-if (state.token && state.user) {
-  showApp();
-} else {
-  showAuth();
+function renderTraderProfilesMine(profiles) {
+  const container = document.getElementById('trader-profiles-mine');
+  if (!profiles || profiles.length === 0) {
+    container.innerHTML = '<p class="empty-state">You haven\'t listed any account as a trader yet — do that from the Account page.</p>';
+    return;
+  }
+
+  container.innerHTML = profiles.map((p) => {
+    const followerPct = Math.min(100, (p.followerCount / p.milestones.minFollowers) * 100);
+    const ratePct = p.successRate === null ? 0 : Math.min(100, (p.successRate / p.milestones.minSuccessRate) * 100);
+    const feeForm = p.milestonesMet
+      ? `<form class="inline-form fee-form" data-trader-id="${p.id}" style="margin-top:12px;">
+           <div class="field-row">
+             <label>Monthly fee, USD
+               <input type="number" name="feeUsd" min="1" step="0.01" value="${p.feeCents ? (p.feeCents / 100).toFixed(2) : ''}" placeholder="e.g. 25.00" required />
+             </label>
+             <button type="submit" class="btn primary" style="align-self:flex-end;">${p.feeEnabled ? 'Update fee' : 'Enable fee'}</button>
+           </div>
+           <p class="form-error" data-fee-error="${p.id}"></p>
+           <p class="hint">This records your fee amount — actual billing/payment collection isn't wired up yet and needs a payment processor added separately.</p>
+         </form>`
+      : `<p class="hint">Meet both milestones to unlock charging a fee for this strategy.</p>`;
+
+    return `
+      <div class="milestone-card">
+        <div class="item-title">${p.headline}${p.feeEnabled ? ` <span class="item-sub">· $${(p.feeCents / 100).toFixed(2)}/mo</span>` : ''}</div>
+        <div class="milestone-row">
+          <span>Followers: ${p.followerCount} / ${p.milestones.minFollowers}</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${followerPct}%"></div></div>
+        <div class="milestone-row" style="margin-top:10px;">
+          <span>Success rate (${p.milestones.successRateWindowDays}d): ${p.successRate === null ? 'no trades yet' : p.successRate + '%'} / ${p.milestones.minSuccessRate}%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${ratePct}%"></div></div>
+        ${feeForm}
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.fee-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const traderId = form.dataset.traderId;
+      const errEl = form.querySelector(`[data-fee-error="${traderId}"]`);
+      errEl.textContent = '';
+      const fd = new FormData(form);
+      const feeCents = Math.round(Number(fd.get('feeUsd')) * 100);
+      try {
+        await api(`/traders/${traderId}/fee`, { method: 'PUT', body: { feeCents } });
+        toast('Fee saved');
+        await Promise.all([loadTraderProfilesMine(), loadTraders()]);
+      } catch (err) {
+        errEl.textContent = err.message;
+      }
+    });
+  });
 }
+
+
+// ---------- Email verification / password reset entry points ----------
+async function handleUrlTokens() {
+  const params = new URLSearchParams(window.location.search);
+  const verifyToken = params.get('verify');
+  const resetToken = params.get('reset');
+
+  if (verifyToken) {
+    document.getElementById('view-auth').classList.add('hidden');
+    document.getElementById('view-verify-email').classList.remove('hidden');
+    const heading = document.getElementById('verify-email-heading');
+    const message = document.getElementById('verify-email-message');
+    const continueBtn = document.getElementById('btn-verify-continue');
+    try {
+      await api('/auth/verify-email', { method: 'POST', body: { token: verifyToken } });
+      heading.textContent = 'Email verified';
+      message.textContent = 'You can now use all features of your account.';
+    } catch (err) {
+      heading.textContent = 'Verification failed';
+      message.textContent = err.message;
+    }
+    continueBtn.classList.remove('hidden');
+    continueBtn.addEventListener('click', () => {
+      window.location.href = window.location.pathname;
+    });
+    return true;
+  }
+
+  if (resetToken) {
+    document.getElementById('view-auth').classList.add('hidden');
+    document.getElementById('view-reset-password').classList.remove('hidden');
+    document.getElementById('form-reset-password').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.querySelector('.form-error[data-for="reset-password"]');
+      errEl.textContent = '';
+      const fd = new FormData(e.target);
+      try {
+        await api('/auth/reset-password', {
+          method: 'POST',
+          body: { token: resetToken, password: fd.get('password') },
+        });
+        toast('Password updated — you can log in now');
+        window.location.href = window.location.pathname;
+      } catch (err) {
+        errEl.textContent = err.message;
+      }
+    });
+    return true;
+  }
+
+  return false;
+}
+
+// ---------- Forgot password ----------
+document.getElementById('btn-show-forgot').addEventListener('click', () => {
+  document.getElementById('form-login').classList.add('hidden');
+  document.getElementById('form-forgot-password').classList.remove('hidden');
+});
+document.getElementById('btn-back-to-login').addEventListener('click', () => {
+  document.getElementById('form-forgot-password').classList.add('hidden');
+  document.getElementById('form-login').classList.remove('hidden');
+});
+document.getElementById('form-forgot-password').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.querySelector('.form-error[data-for="forgot-password"]');
+  errEl.textContent = '';
+  const fd = new FormData(e.target);
+  try {
+    await api('/auth/forgot-password', { method: 'POST', body: { email: fd.get('email') } });
+    document.getElementById('forgot-password-success').style.display = 'block';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+// ---------- Email verification banner ----------
+function renderVerifyBanner() {
+  const banner = document.getElementById('verify-banner');
+  banner.classList.toggle('hidden', !!state.user.email_verified);
+}
+document.getElementById('btn-resend-verification').addEventListener('click', async () => {
+  try {
+    await api('/auth/resend-verification', { method: 'POST', body: { email: state.user.email } });
+    toast('Verification email sent — check your inbox');
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+// ---------- Init ----------
+handleUrlTokens().then((handled) => {
+  if (handled) return;
+  if (state.token && state.user) {
+    showApp();
+  } else {
+    showAuth();
+  }
+});

@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const { pool } = require('./db');
 const { applyMigrations } = require('./db/migrate');
+const { startRiskMonitor } = require('./services/riskMonitor');
 const authRoutes = require('./routes/auth');
 const accountRoutes = require('./routes/accounts');
 const traderRoutes = require('./routes/traders');
@@ -43,5 +44,8 @@ const port = process.env.PORT || 4000;
     process.exit(1);
   }
 
-  app.listen(port, () => console.log(`Copy trading API listening on :${port}`));
+  app.listen(port, () => {
+    console.log(`Copy trading API listening on :${port}`);
+    startRiskMonitor();
+  });
 })();

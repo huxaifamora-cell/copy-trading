@@ -5,6 +5,26 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   display_name TEXT NOT NULL,
+  email_verified BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Email verification tokens (also reused for verification resend flow)
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Password reset tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -33,6 +53,8 @@ CREATE TABLE IF NOT EXISTS trader_profiles (
   headline TEXT NOT NULL,
   description TEXT,
   is_public BOOLEAN NOT NULL DEFAULT true,
+  fee_enabled BOOLEAN NOT NULL DEFAULT false,
+  fee_cents INTEGER,                     -- monthly fee, once milestones are met
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -42,9 +64,23 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   follower_account_id INTEGER NOT NULL REFERENCES mt_accounts(id) ON DELETE CASCADE,
   trader_profile_id INTEGER NOT NULL REFERENCES trader_profiles(id) ON DELETE CASCADE,
   copyfactory_subscription_id TEXT,
-  size_scaling NUMERIC NOT NULL DEFAULT 1.0,  -- e.g. 0.5 = copy at half size
-  max_drawdown_pct NUMERIC NOT NULL DEFAULT 20,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'stopped')),
+  -- Risk configuration chosen by the follower. Shape (all optional except
+  -- lotSizing.mode):
+  -- {
+  --   "lotSizing": { "mode": "mirror" | "balance_scaled" | "multiplier" | "fixed_lot",
+  --                  "multiplier": 1, "fixedLotSize": 0.1 },
+  --   "symbolAllowlist": ["EURUSD", "GBPUSD"] | null (null = all symbols),
+  --   "maxOpenPositions": 5 | null,
+  --   "maxTradesPerDay": 10 | null,
+  --   "dailyLossLimitPct": 5 | null,
+  --   "dailyProfitTargetPct": 10 | null,
+  --   "maxDrawdownPct": 20 | null,
+  --   "perTradeStopLossPips": 50 | null
+  -- }
+  -- "mirror" mode with everything else null means "copy the trader exactly,
+  -- using their own risk appetite" per the follower's choice.
+  risk_settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'stopped')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   stopped_at TIMESTAMPTZ,
   UNIQUE (follower_account_id, trader_profile_id)
@@ -52,6 +88,16 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_follower ON subscriptions(follower_account_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_trader ON subscriptions(trader_profile_id);
+
+-- Bookkeeping for risk rules CopyFactory doesn't enforce natively (max
+-- trades/day, daily profit target). Reset each day by the risk monitor.
+CREATE TABLE IF NOT EXISTS subscription_daily_state (
+  subscription_id INTEGER PRIMARY KEY REFERENCES subscriptions(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  trades_count INTEGER NOT NULL DEFAULT 0,
+  day_start_balance NUMERIC,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- Activity feed: account linked, trader followed/unfollowed, etc.
 CREATE TABLE IF NOT EXISTS notifications (

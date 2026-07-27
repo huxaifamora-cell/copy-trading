@@ -374,6 +374,60 @@ ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: col
   font-size: 12px;
 }
 
+.verify-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  color: var(--gold-bright);
+  padding: 12px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+
+.radio-group-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.radio-group { display: flex; flex-direction: column; gap: 8px; }
+.radio-option {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  cursor: pointer;
+}
+.radio-option input { width: auto; padding: 0; accent-color: var(--gold); }
+
+.milestone-card {
+  background: var(--ink-raised);
+  border: 1px solid var(--hairline-soft);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.milestone-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+.progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: var(--hairline);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--teal), var(--gold)); border-radius: 4px; }
+.progress-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); }
+
 .toast {
   position: fixed;
   bottom: 24px;

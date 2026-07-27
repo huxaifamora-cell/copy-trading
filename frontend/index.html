@@ -33,6 +33,16 @@
         <label>Password<input type="password" name="password" required /></label>
         <button type="submit" class="btn primary full">Log in</button>
         <p class="form-error" data-for="login"></p>
+        <button type="button" class="link-btn" id="btn-show-forgot">Forgot password?</button>
+      </form>
+
+      <form id="form-forgot-password" class="auth-form hidden">
+        <p class="sub" style="margin-bottom: 4px;">Enter your email and we'll send a reset link.</p>
+        <label>Email<input type="email" name="email" required /></label>
+        <button type="submit" class="btn primary full">Send reset link</button>
+        <p class="form-error" data-for="forgot-password"></p>
+        <p class="hint" id="forgot-password-success" style="display:none;">If that email is registered, a reset link has been sent.</p>
+        <button type="button" class="link-btn" id="btn-back-to-login">← Back to log in</button>
       </form>
 
       <form id="form-signup" class="auth-form hidden">
@@ -42,6 +52,33 @@
         <button type="submit" class="btn primary full">Create account</button>
         <p class="form-error" data-for="signup"></p>
       </form>
+    </div>
+  </div>
+</section>
+
+<!-- RESET PASSWORD (shown when the URL has ?reset=TOKEN) -->
+<section id="view-reset-password" class="view hidden">
+  <div class="auth-shell">
+    <div class="auth-mark">Wiretrade</div>
+    <div class="auth-card">
+      <h1>Reset your password</h1>
+      <form id="form-reset-password" class="auth-form">
+        <label>New password<input type="password" name="password" required minlength="8" /></label>
+        <button type="submit" class="btn primary full">Set new password</button>
+        <p class="form-error" data-for="reset-password"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- VERIFY EMAIL (shown when the URL has ?verify=TOKEN) -->
+<section id="view-verify-email" class="view hidden">
+  <div class="auth-shell">
+    <div class="auth-mark">Wiretrade</div>
+    <div class="auth-card">
+      <h1 id="verify-email-heading">Verifying your email…</h1>
+      <p class="sub" id="verify-email-message"></p>
+      <button class="btn primary full hidden" id="btn-verify-continue">Continue to log in</button>
     </div>
   </div>
 </section>
@@ -106,6 +143,11 @@
   </nav>
 
   <main class="content">
+    <div id="verify-banner" class="verify-banner hidden">
+      <span>Please verify your email address to unlock all features.</span>
+      <button class="btn ghost small" id="btn-resend-verification">Resend email</button>
+    </div>
+
 
     <!-- DASHBOARD -->
     <section id="page-dashboard" class="page">
@@ -180,6 +222,68 @@
           <div class="panel-head"><h2>You're following</h2></div>
           <ul id="subscription-list" class="subscription-list"></ul>
         </div>
+      </div>
+
+      <div class="panel" style="margin-top: 20px;">
+        <div class="panel-head"><h2 id="follow-form-title">Copy settings</h2></div>
+        <form id="form-follow" class="inline-form hidden">
+          <input type="hidden" name="traderProfileId" />
+          <p class="item-sub" id="follow-form-target"></p>
+
+          <label class="radio-group-label">Lot sizing</label>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="lotMode" value="mirror" checked /> Mirror trader exactly</label>
+            <label class="radio-option"><input type="radio" name="lotMode" value="balance_scaled" /> Scale by my account balance</label>
+            <label class="radio-option"><input type="radio" name="lotMode" value="multiplier" /> Fixed multiplier of trader's lots</label>
+            <label class="radio-option"><input type="radio" name="lotMode" value="fixed_lot" /> Fixed lot size (approximate)</label>
+          </div>
+          <label id="lot-value-wrap" class="hidden">Multiplier / fixed lot value
+            <input type="number" name="lotValue" step="0.01" min="0.01" placeholder="e.g. 0.5" />
+          </label>
+
+          <div class="field-row">
+            <label>Symbol allow-list (optional)
+              <input type="text" name="symbolAllowlist" placeholder="e.g. EURUSD, GBPUSD (blank = all)" />
+            </label>
+            <label>Per-trade max stop loss, pips (optional)
+              <input type="number" name="perTradeStopLossPips" min="1" placeholder="e.g. 50" />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>Max open positions (optional)
+              <input type="number" name="maxOpenPositions" min="1" placeholder="e.g. 5" />
+            </label>
+            <label>Max trades per day (optional)
+              <input type="number" name="maxTradesPerDay" min="1" placeholder="e.g. 10" />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>Daily loss limit % (optional)
+              <input type="number" name="dailyLossLimitPct" min="0.1" step="0.1" placeholder="e.g. 5" />
+            </label>
+            <label>Daily profit target % (optional)
+              <input type="number" name="dailyProfitTargetPct" min="0.1" step="0.1" placeholder="e.g. 10" />
+            </label>
+          </div>
+
+          <label>Overall max drawdown % <span class="hint">(pauses copying if breached)</span>
+            <input type="number" name="maxDrawdownPct" min="1" step="1" value="20" />
+          </label>
+
+          <p class="hint">Custom limits (max open positions, max trades/day, daily profit target) are enforced by our own monitor, checked every few minutes — not instant like the drawdown and daily-loss limits above.</p>
+
+          <button type="submit" class="btn primary">Confirm and follow</button>
+          <button type="button" class="btn ghost" id="btn-cancel-follow">Cancel</button>
+          <p class="form-error" data-for="follow"></p>
+        </form>
+        <p id="follow-form-placeholder" class="empty-state">Click "Follow" on a trader to configure your copy settings.</p>
+      </div>
+
+      <div class="panel" style="margin-top: 20px;">
+        <div class="panel-head"><h2>Your trader profiles</h2></div>
+        <div id="trader-profiles-mine"><p class="empty-state">You haven't listed any account as a trader yet.</p></div>
       </div>
     </section>
 

@@ -126,6 +126,7 @@ async function getAccountSnapshot(metaapiAccountId, historyDays = 30) {
   const endTime = new Date();
   const startTime = new Date(endTime.getTime() - historyDays * 24 * 60 * 60 * 1000);
   const deals = await connection.getDealsByTimeRange(startTime, endTime);
+  const positions = await connection.getPositions();
 
   // Deals include balance operations (deposits/withdrawals) as well as
   // actual trade fills — keep only closed trade fills for the history view.
@@ -150,6 +151,7 @@ async function getAccountSnapshot(metaapiAccountId, historyDays = 30) {
     freeMargin: info.freeMargin,
     currency: info.currency,
     leverage: info.leverage,
+    openPositionsCount: (positions || []).length,
     trades,
   };
 }

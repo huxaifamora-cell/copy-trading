@@ -112,15 +112,72 @@ into `index.html` during the build (replacing the `__API_BASE__`
 placeholder) — see the inline script at the top of
 `frontend/index.html`.
 
+## Risk management for followers
+
+Each follow relationship carries a `risk_settings` JSON blob covering:
+
+- **Lot sizing** — mirror the trader exactly, scale by account balance, a
+  fixed multiplier of the trader's lot size, or an approximate fixed lot
+  size (CopyFactory has no concept of a literal fixed lot regardless of
+  what the trader trades — `fixed_lot` mode is implemented as a
+  multiplier under the hood, the closest native equivalent)
+- **Symbol allow-list** — only copy specific instruments
+- **Per-trade stop loss cap** (pips)
+- **Overall max drawdown** — pauses copying if breached (native to
+  CopyFactory via `stopOutRisk`)
+- **Daily max loss** — pauses copying for the day if breached (native via
+  `riskLimits` with a `day` period)
+- **Max open positions**, **max trades per day**, **daily profit target** —
+  these are **not** things CopyFactory enforces natively. They're checked
+  by `services/riskMonitor.js`, a polling loop (every 5 minutes) that
+  pauses the subscription if breached. These three rules have a few
+  minutes of latency, unlike the native ones above which act on
+  CopyFactory's side in near real time. At real scale, move this polling
+  loop to its own worker process rather than running it inside the API
+  server.
+
+Followers can also **pause** a subscription (stop copying temporarily,
+keep the configuration) instead of fully unfollowing — see the
+pause/resume endpoints in `routes/subscriptions.js`.
+
+## Trader monetization
+
+Traders can charge a monthly fee once they hit two milestones (constants
+in `routes/traders.js`): a minimum follower count and a minimum success
+rate over their trailing 90 days of trades. **No actual payment
+collection is wired up** — `PUT /api/traders/:id/fee` only records the fee
+amount once milestones are met. Adding real billing (Stripe Connect is
+the natural fit, since it handles payouts to individual traders) is a
+separate integration requiring your own Stripe account and API keys.
+
+## Auth: email verification & password reset
+
+Signup sends a verification email and login/signup responses include
+`email_verified`. There's also a forgot/reset password flow
+(`POST /auth/forgot-password`, `POST /auth/reset-password`). Neither
+gates any functionality by default — add `requireVerifiedEmail`-style
+middleware wherever you want verified-only actions (e.g. before allowing
+someone to become a trader, or before linking a live, non-demo account).
+
+**No email provider is connected yet.** `services/email.js` logs email
+content (including the actual verification/reset link) to the console
+instead of sending it — enough to test the flow end-to-end using Render's
+logs, but not something to leave in place for real users. Swap in a real
+provider (Resend, Postmark, SendGrid, AWS SES, etc.) by replacing the body
+of `sendEmail` in that file, and set `APP_URL` to your real frontend URL
+so the links in those emails point somewhere real.
+
 ## What's deliberately out of scope for this MVP
 
-- **Payments/billing** for trader subscription fees or profit-share — bolt on
-  Stripe Connect once the core follow/copy loop works.
+- **Payment collection** for trader fees — the milestone/fee-setting
+  scaffolding exists (see above), but no processor is wired in.
+- **Sending real emails** — verification/reset links are logged to the
+  console rather than emailed (see above).
 - **KYC/AML** — required in most jurisdictions before handling real accounts
   at scale; not implemented here.
 - **Admin/moderation dashboard** — trader vetting, dispute handling.
-- **Production-grade auth hardening** (refresh tokens, rate limiting, email
-  verification) — the auth here is intentionally minimal.
+- **Further auth hardening** — refresh tokens, rate limiting, and 2FA
+  aren't implemented yet.
 
 ## Regulatory note
 
